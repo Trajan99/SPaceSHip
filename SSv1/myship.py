@@ -7,6 +7,9 @@ import bullet
 import monster
 import random
 import alien
+import item
+
+pyglet.options['audio'] = ('openal', 'pulse', 'directsound', 'silent',) 
 
 my_attrs = ['x', 'y', 'dx', 'dy', 'rotation', 'thrust', 
 					'rot_spd', 'rot_left', 'rot_right', 'engines']
@@ -26,7 +29,9 @@ kill_advance = [3 + 1 * i for i in range(100)]
 
 window = pyglet.window.Window(fullscreen=True)
 pyglet.resource.path.append('./images')
+pyglet.resource.path.append('./audio')
 pyglet.resource.reindex()
+
 
 planet_image = pyglet.resource.image('earth.jpg')
 utils.center_anchor(planet_image)
@@ -38,7 +43,9 @@ alien_image = pyglet.resource.image('monster1.png')
 utils.center_anchor(alien_image)
 eliot_image = pyglet.resource.image('bullet_eliot.jpg')
 utils.center_anchor(eliot_image)
+#bullet_sound = pyglet.resource.media('bullet_long.wav', streaming=False)
 high_score_file = 'high_score.csv'
+
 
 class Planet(pyglet.sprite.Sprite, key.KeyStateHandler):
 	def __init__(self, image, x=0, y=0, batch=None):
@@ -52,10 +59,11 @@ class Planet(pyglet.sprite.Sprite, key.KeyStateHandler):
 		self.aliens = []
 		self.level = 0
 		self.no_aliens = -1.0
-		self.init_life = 3
-		self.max_life = self.init_life
+		self.init_life = 30
+		self.max_life = 3
 		self.total_kills = 0
 		self.level_kills = 0
+		self.items = []
 		self.new_level()
 		self.new_level_time = 0.0
 		self.lyla_mode = False
@@ -63,9 +71,8 @@ class Planet(pyglet.sprite.Sprite, key.KeyStateHandler):
 		self.game_state	= 1
 		self.pause = False
 		self.eliot_mode = False
-		#self.alien_time = 0
-		#self.aliens = []
-		#self.alien_batch = pyglet.graphics.Batch()
+		self.new_bullet = False
+		
 
 	def new_level(self):
 		self.max_aliens = max_aliens[self.level]
@@ -88,6 +95,10 @@ class Planet(pyglet.sprite.Sprite, key.KeyStateHandler):
 			ship.life_timer = 0.0
 			for a_bullet in ship.bullets:
 				ship.bullets.remove(a_bullet)
+
+		for an_item in self.items:
+			self.items.remove(an_item)
+
 
 	def update(self, dt):
 		if not self.pause:
@@ -150,6 +161,19 @@ class Planet(pyglet.sprite.Sprite, key.KeyStateHandler):
 			if planet.max_life <= 0 and planet.game_state == 1:
 				planet.game_state = 2
 
+			if planet.game_state == 1:
+				for an_item in item.item_list:
+					temp_num = sum([1 for the_item in planet.items if the_item.type == an_item])
+					if temp_num < item.item_max[an_item]:
+						temp = random.random()
+						if temp < 1 / (dt * item.item_freq[an_item]):
+							new_item = item.Item(an_item, ship=ship)
+							#print "new item, random: " + str(temp)
+						#else:
+							#print "no item, random: " +  str(temp)
+
+
+
 	def force_on(self, target):
 		if not self.lyla_mode:
 			G = 0.5
@@ -194,14 +218,16 @@ def calc_highscore():
 				high_score_scores.append(my_key)
 			score_list.remove(my_key)
 		
-		if planet.score < min(high_score_scores):
+		if planet.cheat_mode:
+			hs_loc = 20000000
+
+		elif planet.score < min(high_score_scores):
 			hs_loc = len(high_score_scores) + 1
 			
 		else:
-			
 			hs_loc	= min([j for j in range(len(high_score_scores)) if high_score_scores[j] <= planet.score])
 
-	NUM_SHOW = min(10, len(high_score_names) + 1)
+	NUM_SHOW = min(10, len(high_score_names))
 
 	is_high_score = False
 
@@ -214,9 +240,11 @@ def calc_highscore():
 		scores_out = high_score_scores[:hs_loc]
 		names_out.append("**YOU**")
 		scores_out.append(planet.score)
+		NUM_SHOW += 1
 		for i in range(hs_loc, min(NUM_SHOW, len(high_score_names))):
 			names_out.append(high_score_names[i])
 			scores_out.append(high_score_scores[i])
+
 	else:
 		names_out = high_score_names[:NUM_SHOW]
 		scores_out = high_score_scores[:NUM_SHOW]
@@ -231,9 +259,12 @@ def calc_highscore():
 		print my_str
 		if names_out[i] == "**YOU**":
 			is_high_score = True
+	
 	if not is_high_score:
-		high_score_screen.text += "You didn't get a high score!"
-		print "You didn't get a high score!"
+		if planet.cheat_mode: 
+			high_score_screen.text += "No high scores in Cheat Mode!"
+		else:
+			high_score_screen.text += "You didn't get a high score!"
 	else:
 		high_score_screen.text += "Good work!"
 
@@ -248,7 +279,7 @@ center_y = int(window.height/2)
 planet = Planet(planet_image, center_x, center_y, None)
 
 ship_lives = []
-for i in range(max(0,planet.max_life)):
+for i in range(max(0,planet.init_life)):
 	my_y = ship_image.height / 2 + 10
 	my_x = window.width - 20 - (i + 1/2) * ship_image.width
 	ship_lives.append(ShowLife(ship_image, my_x, my_y))
@@ -364,6 +395,11 @@ def on_draw():
 				ship_lives[i].draw()
 			if planet.lyla_mode:
 				lyla_status.draw()
+			for an_item in planet.items:
+				an_item.draw()
+			if planet.new_bullet:
+				#bullet_sound.play()
+				planet.new_bullet = False
 
 		if planet.pause:
 			pause_status.draw()
@@ -392,6 +428,10 @@ def update(dt):
 			an_alien.update(dt)
 			for bullet in an_alien.bullets:
 				bullet.update(dt)
+		for an_item in planet.items:
+			an_item.update(dt)
+		for an_item in ship.items:
+			an_item.update(dt)
 
 window.push_handlers(ship)
 window.push_handlers(planet)

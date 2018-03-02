@@ -2,6 +2,7 @@ import pyglet
 import utils
 import math
 import bullet
+import item
 from pyglet.window import key
 
 pyglet.resource.path.append('./images')
@@ -40,6 +41,7 @@ class Ship(pyglet.sprite.Sprite,
 		self.bullets_batch = pyglet.graphics.Batch()
 		self.max_spd = 250.0
 		self.score = 0
+		self.items = []
 
 
 	def update(self, dt):
@@ -94,6 +96,13 @@ class Ship(pyglet.sprite.Sprite,
 		self.x = utils.wrap(self.x, self.window_width)
 		self.y = utils.wrap(self.y, self.window_height)
 
+		for an_item in self.items:
+			if an_item.type in item.give_life:
+				if self.planet.max_life < self.planet.init_life:
+					self.planet.max_life += 1
+				self.items.remove(an_item)
+				an_item.location = None
+
 		if not self.alive:
 			print ("Dead! Respawn in %s" %
 				self.life_timer)
@@ -113,6 +122,9 @@ class Ship(pyglet.sprite.Sprite,
 		self.dx = 0
 		self.dy = 0
 		self.rotation = self.init_rot
+		for an_item in self.items:
+			if an_item.type in item.lose_on_reset:
+				self.items.remove(an_item)
 
 
 

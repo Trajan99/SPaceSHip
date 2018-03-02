@@ -11,7 +11,7 @@ eliot_image = pyglet.resource.image('bullet_eliot.jpg')
 utils.center_anchor(eliot_image)
 
 class Bullet(pyglet.sprite.Sprite, key.KeyStateHandler):
-	def __init__(self, window_width, window_height, x=0, y=0, dx=0, dy=0, planet=None, ship=None, batch=None, image=bullet_image, timer=5):
+	def __init__(self, window_width, window_height, x=0, y=0, dx=0, dy=0, ship=None, batch=None, image=bullet_image, timer=5):
 		super(Bullet, self).__init__(image, x, y, batch=batch)
 		self.x = x
 		self.y = y
@@ -23,6 +23,7 @@ class Bullet(pyglet.sprite.Sprite, key.KeyStateHandler):
 		self.window_height = window_height
 		self.ship = ship
 		self.rotation = self.ship.rotation
+		self.ship.planet.new_bullet = True
 
 	def update(self, dt):
 		self.x += self.dx * dt
